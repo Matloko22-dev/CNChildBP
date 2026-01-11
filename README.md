@@ -31,7 +31,7 @@
 # 如果未安装 devtools，请先运行:
 # install.packages("devtools")
 
-devtools::install_github("您的GitHub用户名/CNChildBP")
+devtools::install_github("CalebChen941028/CNChildBP")
 
 ```
 
