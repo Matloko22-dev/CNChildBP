@@ -2,8 +2,7 @@
 library(readr)
 library(usethis)
 
-# === 1. 定义修正后的 CSV 内容 (作为默认标准) ===
-# (确保包含女性17岁身高的修正)
+# === 1. 定义标准CSV 内容 (作为默认标准) ===
 csv_content <- "Sex,Age,Height_Lower,Height_Upper,SBP_P50,SBP_P90,SBP_P95,SBP_P99,DBP_P50,DBP_P90,DBP_P95,DBP_P99
 男,3,0,95,88,99,102,108,54,62,65,72
 男,3,96,97,88,100,103,109,54,63,65,72
