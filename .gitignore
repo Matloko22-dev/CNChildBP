@@ -3,3 +3,10 @@
 .Rproj.user/
 .RData
 .claude/
+
+# 大型原始数据文件（保留处理脚本）
+data-raw/*.csv
+data-raw/*.xlsx
+data-raw/*.xls
+data-raw/*.dta
+data-raw/*.sav
