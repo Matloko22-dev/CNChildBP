@@ -75,10 +75,10 @@ evaluate_bp <- function(data,
                         dbp_col = "\u8212\u5f20\u538b",
                         language = c("chinese", "english")) {
 
-  # 0. 匹配语言参数
+  # 0. match language argument
   language <- match.arg(language)
 
-  # 定义评价标签（中英文）
+  # define labels (Chinese/English)
   labels <- if (language == "chinese") {
     list(
       normal = "\u6b63\u5e38",
@@ -99,20 +99,20 @@ evaluate_bp <- function(data,
     )
   }
 
-  # 1. 检查必要列是否存在
+  # 1. check required columns exist
   required_cols <- c(sex_col, age_col, height_col, sbp_col, dbp_col)
   missing_cols <- setdiff(required_cols, names(data))
   if (length(missing_cols) > 0) {
     stop("\u6570\u636e\u4e2d\u7f3a\u5c11\u4ee5\u4e0b\u5217: ", paste(missing_cols, collapse = ", "))
   }
 
-  # ==========================================================================
-  # 定义内部辅助函数：智能解析年龄 (鲁棒性处理)
-  # ==========================================================================
+  # ========================================================================
+  # internal helper: robust age parsing
+  # ========================================================================
   parse_smart_age <- function(x) {
-    # 转换为字符并去除所有空格
+    # convert to character and remove whitespace
     x_str <- stringr::str_remove_all(as.character(x), "\\s+")
-    # 匹配数字的正则模式 (支持小数)
+    # numeric pattern (allow decimals)
     num_pattern <- "\\d+(\\.\\d+)?"
 
     sapply(x_str, function(s) {
@@ -138,7 +138,7 @@ evaluate_bp <- function(data,
         num <- stringr::str_extract(s, num_pattern)
         val <- as.numeric(num) / 12
       }
-      # 模式4: 纯数字 / 纯数字字符串 ("6", "6.5", "74")
+      # pattern4: pure numeric strings ("6", "6.5", "74")
       else {
         num_val <- as.numeric(s)
         if (!is.na(num_val)) {
@@ -157,8 +157,8 @@ evaluate_bp <- function(data,
     })
   }
 
-  # 2. 准备数据与清洗
-  # 复制数据并创建临时ID，确保后续合并不乱序
+  # 2. prepare and clean data
+  # copy data and add temporary id to preserve row order
   work_data <- data
   work_data$..temp_id.. <- 1:nrow(work_data)
 
@@ -171,34 +171,33 @@ evaluate_bp <- function(data,
       DBP_ = !!dplyr::sym(dbp_col)
     ) %>%
     dplyr::mutate(
-      # 步骤A: 智能解析年龄
+      # step A: parse age
       Age_Parsed_ = parse_smart_age(Age_Raw_),
 
-      # 步骤B: 标准化处理
-      # 年龄：向下取整 (周岁)，对应量表中的 Age
+      # step B: standardize
+      # age: floor to whole years for table lookup
       Age_Final_ = floor(Age_Parsed_),
 
-      # 身高：四舍五入 (符合国标取整查表要求)
-      # floor(x + 0.5) 是标准的四舍五入算法
+      # height: round half up (floor(x + 0.5)) for table matching
       Height_Final_ = floor(Height_ + 0.5)
     )
 
-  # 3. 加载参照数据
+  # 3. load reference standards
   standards <- CNChildBP::bp_standards
 
-  # 4. 匹配逻辑 (查表)
+  # 4. matching logic (table lookup)
   matched <- work_data %>%
-    # 过滤掉无法解析年龄或身高的行 (这些行最后会标记为无法评价)
+    # filter out rows with unparsed age/height (will be marked as out-of-range)
     dplyr::filter(!is.na(Age_Final_), !is.na(Height_Final_)) %>%
-    # 按 性别 和 年龄 进行连接
+    # join by sex and age
     dplyr::left_join(standards, by = c("Sex_" = "Sex", "Age_Final_" = "Age")) %>%
-    # 筛选符合身高区间的行
+    # filter rows within height interval
     dplyr::filter(Height_Final_ >= Height_Lower & Height_Final_ <= Height_Upper)
 
-  # 5. 评价计算 (根据 P90, P95, P99+5 判定)
+  # 5. evaluation (based on P90, P95, P99+5)
   results_calculated <- matched %>%
     dplyr::mutate(
-      # --- 收缩压 (SBP) 评价 ---
+      # --- systolic BP (SBP) evaluation ---
       sbp_status = dplyr::case_when(
         is.na(SBP_) ~ labels$missing,
         # 2期: >= P99 + 5 mmHg
@@ -210,7 +209,7 @@ evaluate_bp <- function(data,
         TRUE ~ labels$normal
       ),
 
-      # --- 舒张压 (DBP) 评价 ---
+      # --- diastolic BP (DBP) evaluation ---
       dbp_status = dplyr::case_when(
         is.na(DBP_) ~ labels$missing,
         DBP_ >= (DBP_P99 + 5) ~ labels$stage2,
@@ -219,7 +218,7 @@ evaluate_bp <- function(data,
         TRUE ~ labels$normal
       ),
 
-      # --- 综合评价 (取两者中较严重者) ---
+      # --- combined evaluation (take the more severe of SBP/DBP) ---
       BP_Evaluation = dplyr::case_when(
         sbp_status == labels$stage2 | dbp_status == labels$stage2 ~ labels$stage2,
         sbp_status == labels$stage1 | dbp_status == labels$stage1 ~ labels$stage1,
@@ -230,7 +229,7 @@ evaluate_bp <- function(data,
     ) %>%
     dplyr::select(..temp_id.., BP_Evaluation)
 
-  # 6. 将结果合并回原始数据
+  # 6. merge results back to original data
   final_result <- data
   final_result$..temp_id.. <- 1:nrow(final_result)
 
@@ -238,7 +237,7 @@ evaluate_bp <- function(data,
     dplyr::left_join(results_calculated, by = "..temp_id..") %>%
     dplyr::select(-..temp_id..)
 
-  # 填补未匹配到的行 (年龄过大/过小，或者身高数据缺失)
+  # fill unmatched rows (age/height out of range or missing)
   final_result$BP_Evaluation[is.na(final_result$BP_Evaluation)] <- labels$out_of_range
 
   return(final_result)
