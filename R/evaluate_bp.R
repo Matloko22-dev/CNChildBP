@@ -75,7 +75,6 @@
 #' @examples
 #' # 1. 基础用法
 #' df_basic <- data.frame(
-if (getRversion() >= "2.15.1") utils::globalVariables(c("bp_standards"))
 #'   性别 = c("男", "女"),
 #'   年龄 = c(10, 12),
 #'   身高 = c(140, 150),
@@ -275,3 +274,7 @@ evaluate_bp <- function(data,
 
   return(final_result)
 }
+
+
+## Declare globals to satisfy R CMD check NOTES about undefined globals
+ 
