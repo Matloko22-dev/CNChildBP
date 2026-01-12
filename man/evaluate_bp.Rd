@@ -11,6 +11,7 @@ evaluate_bp(
   height_col = "身高",
   sbp_col = "收缩压",
   dbp_col = "舒张压"
+  language = c("chinese", "english")
 )
 }
 \arguments{
@@ -41,6 +42,7 @@ evaluate_bp(
 \itemize{
 \item 单位：\strong{毫米汞柱 (mmHg)}。
 }}
+\item{language}{字符串。评价结果的语言，可选 \code{"chinese"}（默认）或 \code{"english"}。}
 }
 \value{
 返回原始数据框 \code{data}，并在最后增加一列：

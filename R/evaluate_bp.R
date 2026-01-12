@@ -75,6 +75,7 @@
 #' @examples
 #' # 1. 基础用法
 #' df_basic <- data.frame(
+if (getRversion() >= "2.15.1") utils::globalVariables(c("bp_standards"))
 #'   性别 = c("男", "女"),
 #'   年龄 = c(10, 12),
 #'   身高 = c(140, 150),
@@ -99,11 +100,11 @@
 #' # 3. 使用英文标识
 #' # evaluate_bp(df_basic, language = "english")
 evaluate_bp <- function(data,
-                        sex_col = "性别",
-                        age_col = "年龄",
-                        height_col = "身高",
-                        sbp_col = "收缩压",
-                        dbp_col = "舒张压",
+                        sex_col = "\u6027\u522b",
+                        age_col = "\u5e74\u9f84",
+                        height_col = "\u8eab\u9ad8",
+                        sbp_col = "\u6536\u7f29\u538b",
+                        dbp_col = "\u8212\u5f20\u538b",
                         language = c("chinese", "english")) {
 
   # 0. 匹配语言参数
@@ -112,12 +113,12 @@ evaluate_bp <- function(data,
   # 定义评价标签（中英文）
   labels <- if (language == "chinese") {
     list(
-      normal = "正常",
-      high_normal = "正常高值",
-      stage1 = "1期高血压",
-      stage2 = "2期高血压",
-      missing = "缺失",
-      out_of_range = "无法评价(年龄/身高超出范围)"
+      normal = "\u6b63\u5e38",
+      high_normal = "\u6b63\u5e38\u9ad8\u503c",
+      stage1 = "1\u671f\u9ad8\u8840\u538b",
+      stage2 = "2\u671f\u9ad8\u8840\u538b",
+      missing = "\u7f3a\u5c11",
+      out_of_range = "\u65e0\u6cd5\u8bc4\u4ef7(\u5e74\u9f84/\u8eab\u9ad8\u8d85\u51fa\u8303\u56f4)"
     )
   } else {
     list(
@@ -134,7 +135,7 @@ evaluate_bp <- function(data,
   required_cols <- c(sex_col, age_col, height_col, sbp_col, dbp_col)
   missing_cols <- setdiff(required_cols, names(data))
   if (length(missing_cols) > 0) {
-    stop("数据中缺少以下列: ", paste(missing_cols, collapse = ", "))
+    stop("\u6570\u636e\u4e2d\u7f3a\u5c11\u4ee5\u4e0b\u5217: ", paste(missing_cols, collapse = ", "))
   }
 
   # ==========================================================================
