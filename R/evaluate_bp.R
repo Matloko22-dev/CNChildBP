@@ -1,123 +1,160 @@
-#' 评价中国3-17岁儿童青少年血压 (基于2017年国标)
+#' @title Blood pressure evaluation for Chinese children and adolescents (ages 3-17)
+#' @name evaluate_bp
 #'
 #' @description
-#' 本函数依据 2017 年发布的《中国3～17岁儿童性别、年龄别和身高别血压参照标准》，对儿童青少年的血压状况进行自动评价。
-#' 函数内置了智能解析逻辑，能够处理各种非标准化的年龄格式（如"3岁5月"），并严格按照医学标准进行身高查表和血压分级。
-#'
-#' @references
-#' 范晖, 闫银坤, 米杰. 中国3～17岁儿童性别、年龄别和身高别血压参照标准修订\[J\]. 中华高血压杂志, 2017, 25(5): 428-435. DOI: 10.16439/j.cnki.1673-7245.2017.05.009
+#' Evaluate pediatric blood pressure according to the 2017 Chinese
+#' sex-/age-/height-specific reference standards. The function includes
+#' robust input parsing for non-standard age formats and performs height
+#' rounding and percentile-based classification.
 #'
 #' @details
-#' **1. 智能年龄解析逻辑 (Robust Age Parsing)**
-#' 为了提高数据处理的鲁棒性，函数按以下优先级处理 `age_col` 列：
+#' Column mapping behavior:
 #' \itemize{
-#'   \item **"岁"与"月"混用**：如 "3岁5月"，自动转换为 \eqn{3 + 5/12} 岁。
-#'   \item **纯"岁"或纯"月"**：自动提取数字部分并识别单位。
-#'   \item **纯数字智能推断**：
-#'     \itemize{
-#'       \item 数值 > 18：视为"月龄" (因为17岁是量表上限)，自动除以12转换为岁。
-#'       \item 数值 <= 18：视为"岁龄"。
-#'     }
-#'   \item **查表标准**：计算出的年龄将**向下取整** (floor) 为周岁进行查表。
+#'   \item If `sex_col/age_col/height_col/sbp_col/dbp_col` are not provided (all `NULL`), the function selects a default column-name mapping by `language`.
+#'   \item `language = "chinese"` prefers: "性别"/"年龄"/"身高"/"收缩压"/"舒张压".
+#'   \item `language = "english"` prefers: "sex"/"age"/"height"/"sbp"/"dbp".
+#'   \item If the preferred set is not found and the user did not provide any mapping arguments, the function will try the other set as a fallback.
+#'   \item If any `*_col` is explicitly provided, the function uses the provided mapping (no automatic fallback).
 #' }
 #'
-#' **2. 身高查表逻辑 (Height Matching)**
+#' Sex normalization:
 #' \itemize{
-#'   \item 依据标准，身高需精确匹配表格中的区间。
-#'   \item 函数会对输入的 `height_col` 进行**四舍五入** (\code{floor(x + 0.5)}) 取整后，再与标准表中的身高段进行匹配。
+#'   \item Common inputs such as "male"/"female" (or "m"/"f") are normalized to "男"/"女" before table lookup.
 #' }
 #'
-#' **3. 血压评价标准 (Evaluation Criteria)**
-#' 依据 2017 年国标及临床指南，评价结果分为以下四类：
+#' Robust age parsing logic:
 #' \itemize{
-#'   \item **正常 (Normal)**: SBP < P90 且 DBP < P90
-#'   \item **正常高值 (High-normal)**: P90 ≤ BP < P95，或 BP ≥ 120/80 mmHg (且未达到高血压标准)
-#'   \item **1期高血压 (Stage 1 Hypertension)**: P95 ≤ BP < P99 + 5 mmHg
-#'   \item **2期高血压 (Stage 2 Hypertension)**: BP ≥ P99 + 5 mmHg
+#'   \item Mixed years and months (e.g. "3 years 5 months") are parsed as \eqn{years + months/12}.
+#'   \item Pure numeric values are interpreted as years if <= 18, otherwise as months (divided by 12).
+#'   \item Parsed ages are floored to whole years for table lookup.
 #' }
-#' *注：收缩压(SBP)和舒张压(DBP)分别评价，最终结果取两者中较严重者。*
 #'
-#' @param data 一个数据框 (data.frame)，包含待评价的儿童体检数据。
-#' @param sex_col 字符串。指定性别列的名称（默认为 "性别"）。
-#'   \itemize{
-#'     \item 数据要求：必须包含 "男" 或 "女"，或可被转换为字符的标识。
-#'   }
-#' @param age_col 字符串。指定年龄列的名称（默认为 "年龄"）。
-#'   \itemize{
-#'     \item 支持格式：数值 (如 10.5)、字符串 (如 "10岁"、"120月")。
-#'     \item 范围：3岁 ~ 17岁 (不满3岁或超过18岁将返回 "无法评价")。
-#'   }
-#' @param height_col 字符串。指定身高列的名称（默认为 "身高"）。
-#'   \itemize{
-#'     \item 单位：**厘米 (cm)**。需注意数据应为数值型。
-#'   }
-#' @param sbp_col 字符串。指定收缩压(高压)列的名称（默认为 "收缩压"）。
-#'   \itemize{
-#'     \item 单位：**毫米汞柱 (mmHg)**。
-#'   }
-#' @param dbp_col 字符串。指定舒张压(低压)列的名称（默认为 "舒张压"）。
-#'   \itemize{
-#'     \item 单位：**毫米汞柱 (mmHg)**。
-#'   }
-#' @param language 字符串。评价结果的语言，可选 `"chinese"`（默认）或 `"english"`。
-#'   \itemize{
-#'     \item `"chinese"`: 返回中文标识（正常、正常高值、1期高血压、2期高血压）
-#'     \item `"english"`: 返回英文标识（Normal、High-normal、Stage 1、Stage 2）
-#'   }
+#' Height matching:
+#' \itemize{
+#'   \item Heights are rounded using "round half up": \code{floor(x + 0.5)} before matching table intervals.
+#' }
 #'
-#' @return 返回原始数据框 `data`，并在最后增加一列：
-#' \item{BP_Evaluation}{字符型列，包含评价结果："正常"、"正常高值"、"1期高血压"、"2期高血压"、"缺失" 或 "无法评价(年龄/身高超出范围)"。}
+#' Evaluation categories:
+#' \itemize{
+#'   \item Normal: SBP < P90 and DBP < P90
+#'   \item High-normal: P90 ≤ BP < P95, or BP ≥ 120/80 mmHg (but below hypertension thresholds)
+#'   \item Stage 1 Hypertension: P95 ≤ BP < P99 + 5 mmHg
+#'   \item Stage 2 Hypertension: BP ≥ P99 + 5 mmHg
+#' }
+#'
+#' Important note (diagnosis vs classification):
+#' \itemize{
+#'   \item This function performs single-record BP \emph{classification} based on percentile thresholds.
+#'   \item Clinical \emph{diagnosis} of pediatric hypertension typically requires elevated BP (≥ P95)
+#'     confirmed at multiple visits (e.g., re-check after 2--4 weeks and confirmed across 3 time points),
+#'     as described in related hypertension guidelines.
+#' }
+#'
+#' @param data A data.frame containing measurements to evaluate.
+#' @param sex_col Character; name of the sex column.
+#'   If `NULL` (default), the function uses a language-specific default mapping:
+#'   Chinese: "性别"; English: "sex".
+#' @param age_col Character; name of the age column.
+#'   If `NULL` (default), the function uses a language-specific default mapping:
+#'   Chinese: "年龄"; English: "age".
+#'   Supported formats include numeric years, "10", "10.5", "10岁",
+#'   "3岁5月", "3y5m", "75months", "75月", etc.
+#' @param height_col Character; name of the height column in cm.
+#'   If `NULL` (default), the function uses a language-specific default mapping:
+#'   Chinese: "身高"; English: "height".
+#' @param sbp_col Character; name of systolic BP column.
+#'   If `NULL` (default), the function uses a language-specific default mapping:
+#'   Chinese: "收缩压"; English: "sbp".
+#' @param dbp_col Character; name of diastolic BP column.
+#'   If `NULL` (default), the function uses a language-specific default mapping:
+#'   Chinese: "舒张压"; English: "dbp".
+#' @param language Character; one of "chinese" (default) or "english" for output labels.
+#'
+#' @return The input data.frame with an added `BP_Evaluation` column.
 #'
 #' @import dplyr
 #' @import stringr
 #' @export
 #'
 #' @examples
-#' # 1. 基础用法
-#' df_basic <- data.frame(
+#' # 1. Basic usage (Chinese columns; default language = "chinese")
+#' df_cn <- data.frame(
 #'   性别 = c("男", "女"),
 #'   年龄 = c(10, 12),
 #'   身高 = c(140, 150),
 #'   收缩压 = c(110, 130),
 #'   舒张压 = c(70, 85)
 #' )
-#' # evaluate_bp(df_basic)
+#' # evaluate_bp(df_cn)
 #'
-#' # 2. 处理复杂年龄格式
+#' # 2. Basic usage (English columns; use language = "english")
+#' df_en <- data.frame(
+#'   sex = c("male", "female"),
+#'   age = c(10, 12),
+#'   height = c(140, 150),
+#'   sbp = c(110, 130),
+#'   dbp = c(70, 85)
+#' )
+#' # evaluate_bp(df_en, language = "english")
+#'
+#' # 3. Handle mixed age formats
 #' df_complex <- data.frame(
-#'   sex = c("男", "男", "女"),
-#'   age = c("75月", "3岁5月", "120"), # 分别对应：6.25岁, 3.41岁, 10岁
-#'   ht = c(120.5, 98, 140),
+#'   sex = c("male", "male", "female"),
+#'   age = c("75months", "3y5m", "120"), # 6.25y, 3.41y, 10y
+#'   height = c(120.5, 98, 140),
 #'   sbp = c(110, 90, 130),
 #'   dbp = c(70, 60, 85)
 #' )
-#' # 指定列名进行评价
-#' # evaluate_bp(df_complex,
-#' #             sex_col = "sex", age_col = "age", height_col = "ht",
-#' #             sbp_col = "sbp", dbp_col = "dbp")
+#' # evaluate_bp(df_complex, language = "english")
 #'
-#' # 3. 使用英文标识
-#' # evaluate_bp(df_basic, language = "english")
+#' # 4. Output labels can be switched via `language`
+#' # evaluate_bp(df_cn, language = "english")
 evaluate_bp <- function(data,
-                        sex_col = "性别",
-                        age_col = "年龄",
-                        height_col = "身高",
-                        sbp_col = "收缩压",
-                        dbp_col = "舒张压",
+                        sex_col = NULL,
+                        age_col = NULL,
+                        height_col = NULL,
+                        sbp_col = NULL,
+                        dbp_col = NULL,
                         language = c("chinese", "english")) {
 
-  # 0. 匹配语言参数
+  # 0. match language argument
   language <- match.arg(language)
 
-  # 定义评价标签（中英文）
+  # 0b. column name mapping defaults
+  user_provided_mapping <- !is.null(sex_col) || !is.null(age_col) || !is.null(height_col) || !is.null(sbp_col) || !is.null(dbp_col)
+  default_cols <- if (language == "chinese") {
+    list(
+      sex_col = "\u6027\u522b",
+      age_col = "\u5e74\u9f84",
+      height_col = "\u8eab\u9ad8",
+      sbp_col = "\u6536\u7f29\u538b",
+      dbp_col = "\u8212\u5f20\u538b"
+    )
+  } else {
+    list(
+      sex_col = "sex",
+      age_col = "age",
+      height_col = "height",
+      sbp_col = "sbp",
+      dbp_col = "dbp"
+    )
+  }
+
+  if (is.null(sex_col)) sex_col <- default_cols$sex_col
+  if (is.null(age_col)) age_col <- default_cols$age_col
+  if (is.null(height_col)) height_col <- default_cols$height_col
+  if (is.null(sbp_col)) sbp_col <- default_cols$sbp_col
+  if (is.null(dbp_col)) dbp_col <- default_cols$dbp_col
+
+  # define labels/messages (Chinese/English)
   labels <- if (language == "chinese") {
     list(
-      normal = "正常",
-      high_normal = "正常高值",
-      stage1 = "1期高血压",
-      stage2 = "2期高血压",
-      missing = "缺失",
-      out_of_range = "无法评价(年龄/身高超出范围)"
+      normal = "\u6b63\u5e38",
+      high_normal = "\u6b63\u5e38\u9ad8\u503c",
+      stage1 = "1\u671f\u9ad8\u8840\u538b",
+      stage2 = "2\u671f\u9ad8\u8840\u538b",
+      missing = "\u7f3a\u5c11",
+      out_of_range = "\u65e0\u6cd5\u8bc4\u4ef7(\u5e74\u9f84/\u8eab\u9ad8\u8d85\u51fa\u8303\u56f4)"
     )
   } else {
     list(
@@ -130,66 +167,109 @@ evaluate_bp <- function(data,
     )
   }
 
-  # 1. 检查必要列是否存在
-  required_cols <- c(sex_col, age_col, height_col, sbp_col, dbp_col)
-  missing_cols <- setdiff(required_cols, names(data))
-  if (length(missing_cols) > 0) {
-    stop("数据中缺少以下列: ", paste(missing_cols, collapse = ", "))
+  messages <- if (language == "chinese") {
+    list(
+      missing_cols_prefix = "\u6570\u636e\u4e2d\u7f3a\u5c11\u4ee5\u4e0b\u5217: "
+    )
+  } else {
+    list(
+      missing_cols_prefix = "Missing required column(s): "
+    )
   }
 
-  # ==========================================================================
-  # 定义内部辅助函数：智能解析年龄 (鲁棒性处理)
-  # ==========================================================================
+  # helper: normalize sex values to match standards (typically "\u7537"/"\u5973")
+  normalize_sex <- function(x) {
+    x_chr <- stringr::str_trim(as.character(x))
+    x_lower <- tolower(x_chr)
+    dplyr::case_when(
+      is.na(x_chr) ~ NA_character_,
+      x_lower %in% c("\u7537", "m", "male", "boy", "man") ~ "\u7537",
+      x_lower %in% c("\u5973", "f", "female", "girl", "woman") ~ "\u5973",
+      TRUE ~ x_chr
+    )
+  }
+
+  # 1. check required columns exist
+  required_cols <- c(sex_col, age_col, height_col, sbp_col, dbp_col)
+  missing_cols <- setdiff(required_cols, names(data))
+
+  # If user did not provide any mapping args, try the other language's defaults as a fallback.
+  if (length(missing_cols) > 0 && !user_provided_mapping) {
+    fallback_cols <- if (language == "chinese") {
+      list(sex_col = "sex", age_col = "age", height_col = "height", sbp_col = "sbp", dbp_col = "dbp")
+    } else {
+      list(
+        sex_col = "\u6027\u522b",
+        age_col = "\u5e74\u9f84",
+        height_col = "\u8eab\u9ad8",
+        sbp_col = "\u6536\u7f29\u538b",
+        dbp_col = "\u8212\u5f20\u538b"
+      )
+    }
+
+    fallback_required <- c(fallback_cols$sex_col, fallback_cols$age_col, fallback_cols$height_col, fallback_cols$sbp_col, fallback_cols$dbp_col)
+    if (all(fallback_required %in% names(data))) {
+      sex_col <- fallback_cols$sex_col
+      age_col <- fallback_cols$age_col
+      height_col <- fallback_cols$height_col
+      sbp_col <- fallback_cols$sbp_col
+      dbp_col <- fallback_cols$dbp_col
+      required_cols <- fallback_required
+      missing_cols <- character(0)
+    }
+  }
+
+  if (length(missing_cols) > 0) {
+    stop(messages$missing_cols_prefix, paste(missing_cols, collapse = ", "))
+  }
+
+  # ========================================================================
+  # internal helper: robust age parsing
+  # ========================================================================
   parse_smart_age <- function(x) {
-    # 转换为字符并去除所有空格
+    # convert to character and remove whitespace
     x_str <- stringr::str_remove_all(as.character(x), "\\s+")
-    # 匹配数字的正则模式 (支持小数)
-    num_pattern <- "\\d+(\\.\\d+)?"
+
+    year_pat <- "(?i)(\\d+(?:\\.\\d+)?)\\s*(\u5c81|y|yr|yrs|year|years)"
+    month_pat <- "(?i)(\\d+(?:\\.\\d+)?)\\s*(\u6708|m|mo|mos|month|months)"
+
+    extract_num <- function(s, pat) {
+      m <- stringr::str_match(s, pat)
+      if (is.null(dim(m)) || nrow(m) == 0 || is.na(m[1, 2])) return(NA_real_)
+      as.numeric(m[1, 2])
+    }
 
     sapply(x_str, function(s) {
       if (is.na(s) || s == "NA" || s == "") return(NA_real_)
 
-      val <- NA_real_
+      years <- extract_num(s, year_pat)
+      months <- extract_num(s, month_pat)
 
-      # 模式1: "3岁5月" (同时包含岁和月)
-      if (stringr::str_detect(s, "岁") && stringr::str_detect(s, "月")) {
-        parts <- stringr::str_match_all(s, num_pattern)[[1]][,1]
-        if (length(parts) >= 2) {
-          # 公式：岁 + 月/12
-          val <- as.numeric(parts[1]) + as.numeric(parts[2]) / 12
-        }
+      if (!is.na(years) && !is.na(months)) {
+        return(years + months / 12)
       }
-      # 模式2: "6岁" / "6.5岁" (仅包含岁)
-      else if (stringr::str_detect(s, "岁")) {
-        num <- stringr::str_extract(s, num_pattern)
-        val <- as.numeric(num)
+
+      if (!is.na(years)) {
+        return(years)
       }
-      # 模式3: "75月" (仅包含月)
-      else if (stringr::str_detect(s, "月")) {
-        num <- stringr::str_extract(s, num_pattern)
-        val <- as.numeric(num) / 12
+
+      if (!is.na(months)) {
+        return(months / 12)
       }
-      # 模式4: 纯数字 / 纯数字字符串 ("6", "6.5", "74")
-      else {
-        num_val <- as.numeric(s)
-        if (!is.na(num_val)) {
-          # 智能阈值判断:
-          # 3-17岁是量表区间。18岁以上通常不适用此表。
-          # 如果数值 > 18，极大概率是“月龄”(如74月)
-          # 如果数值 <= 18，默认为“岁龄”
-          if (num_val > 18) {
-            val <- num_val / 12
-          } else {
-            val <- num_val
-          }
-        }
+
+      num_val <- suppressWarnings(as.numeric(s))
+      if (!is.na(num_val)) {
+        # If value > 18, it is likely months (e.g., 74 months). Otherwise treat as years.
+        if (num_val > 18) return(num_val / 12)
+        return(num_val)
       }
-      return(val)
+
+      NA_real_
     })
   }
 
-  # 2. 准备数据与清洗
-  # 复制数据并创建临时ID，确保后续合并不乱序
+  # 2. prepare and clean data
+  # copy data and add temporary id to preserve row order
   work_data <- data
   work_data$..temp_id.. <- 1:nrow(work_data)
 
@@ -202,34 +282,36 @@ evaluate_bp <- function(data,
       DBP_ = !!dplyr::sym(dbp_col)
     ) %>%
     dplyr::mutate(
-      # 步骤A: 智能解析年龄
+      # step 0: normalize sex to match reference table
+      Sex_ = normalize_sex(Sex_),
+
+      # step A: parse age
       Age_Parsed_ = parse_smart_age(Age_Raw_),
 
-      # 步骤B: 标准化处理
-      # 年龄：向下取整 (周岁)，对应量表中的 Age
+      # step B: standardize
+      # age: floor to whole years for table lookup
       Age_Final_ = floor(Age_Parsed_),
 
-      # 身高：四舍五入 (符合国标取整查表要求)
-      # floor(x + 0.5) 是标准的四舍五入算法
+      # height: round half up (floor(x + 0.5)) for table matching
       Height_Final_ = floor(Height_ + 0.5)
     )
 
-  # 3. 加载参照数据
+  # 3. load reference standards
   standards <- CNChildBP::bp_standards
 
-  # 4. 匹配逻辑 (查表)
+  # 4. matching logic (table lookup)
   matched <- work_data %>%
-    # 过滤掉无法解析年龄或身高的行 (这些行最后会标记为无法评价)
+    # filter out rows with unparsed age/height (will be marked as out-of-range)
     dplyr::filter(!is.na(Age_Final_), !is.na(Height_Final_)) %>%
-    # 按 性别 和 年龄 进行连接
+    # join by sex and age
     dplyr::left_join(standards, by = c("Sex_" = "Sex", "Age_Final_" = "Age")) %>%
-    # 筛选符合身高区间的行
+    # filter rows within height interval
     dplyr::filter(Height_Final_ >= Height_Lower & Height_Final_ <= Height_Upper)
 
-  # 5. 评价计算 (根据 P90, P95, P99+5 判定)
+  # 5. evaluation (based on P90, P95, P99+5)
   results_calculated <- matched %>%
     dplyr::mutate(
-      # --- 收缩压 (SBP) 评价 ---
+      # --- systolic BP (SBP) evaluation ---
       sbp_status = dplyr::case_when(
         is.na(SBP_) ~ labels$missing,
         # 2期: >= P99 + 5 mmHg
@@ -241,7 +323,7 @@ evaluate_bp <- function(data,
         TRUE ~ labels$normal
       ),
 
-      # --- 舒张压 (DBP) 评价 ---
+      # --- diastolic BP (DBP) evaluation ---
       dbp_status = dplyr::case_when(
         is.na(DBP_) ~ labels$missing,
         DBP_ >= (DBP_P99 + 5) ~ labels$stage2,
@@ -250,7 +332,7 @@ evaluate_bp <- function(data,
         TRUE ~ labels$normal
       ),
 
-      # --- 综合评价 (取两者中较严重者) ---
+      # --- combined evaluation (take the more severe of SBP/DBP) ---
       BP_Evaluation = dplyr::case_when(
         sbp_status == labels$stage2 | dbp_status == labels$stage2 ~ labels$stage2,
         sbp_status == labels$stage1 | dbp_status == labels$stage1 ~ labels$stage1,
@@ -261,7 +343,7 @@ evaluate_bp <- function(data,
     ) %>%
     dplyr::select(..temp_id.., BP_Evaluation)
 
-  # 6. 将结果合并回原始数据
+  # 6. merge results back to original data
   final_result <- data
   final_result$..temp_id.. <- 1:nrow(final_result)
 
@@ -269,8 +351,12 @@ evaluate_bp <- function(data,
     dplyr::left_join(results_calculated, by = "..temp_id..") %>%
     dplyr::select(-..temp_id..)
 
-  # 填补未匹配到的行 (年龄过大/过小，或者身高数据缺失)
+  # fill unmatched rows (age/height out of range or missing)
   final_result$BP_Evaluation[is.na(final_result$BP_Evaluation)] <- labels$out_of_range
 
   return(final_result)
 }
+
+
+## Declare globals to satisfy R CMD check NOTES about undefined globals
+ 
