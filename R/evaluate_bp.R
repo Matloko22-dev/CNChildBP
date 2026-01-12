@@ -1,4 +1,5 @@
-## Blood pressure evaluation for Chinese children and adolescents (ages 3-17)
+#' @title Blood pressure evaluation for Chinese children and adolescents (ages 3-17)
+#' @name evaluate_bp
 #'
 #' @description
 #' Evaluate pediatric blood pressure according to the 2017 Chinese
