@@ -20,25 +20,25 @@ evaluate_bp(
 
 \item{sex_col}{Character; name of the sex column.
 If \code{NULL} (default), the function uses a language-specific default mapping:
-Chinese: "\u6027\u522b"; English: "sex".}
+Chinese: \verb{\\u6027\\u522b}; English: "sex".}
 
 \item{age_col}{Character; name of the age column.
 If \code{NULL} (default), the function uses a language-specific default mapping:
-Chinese: "\u5e74\u9f84"; English: "age".
-Supported formats include numeric years, "10", "10.5", "10\u5c81",
-"3\u5c81 5\u6708", "3y5m", "75months", "75\u6708", etc.}
+Chinese: \verb{\\u5e74\\u9f84}; English: "age".
+Supported formats include numeric years, "10", "10.5", \verb{10\\u5c81},
+\verb{3\\u5c81 5\\u6708}, "3y5m", "75months", \verb{75\\u6708}, etc.}
 
 \item{height_col}{Character; name of the height column in cm.
 If \code{NULL} (default), the function uses a language-specific default mapping:
-Chinese: "\u8eab\u9ad8"; English: "height".}
+Chinese: \verb{\\u8eab\\u9ad8}; English: "height".}
 
 \item{sbp_col}{Character; name of systolic BP column.
 If \code{NULL} (default), the function uses a language-specific default mapping:
-Chinese: "\u6536\u7f29\u538b"; English: "sbp".}
+Chinese: \verb{\\u6536\\u7f29\\u538b}; English: "sbp".}
 
 \item{dbp_col}{Character; name of diastolic BP column.
 If \code{NULL} (default), the function uses a language-specific default mapping:
-Chinese: "\u8212\u5f20\u538b"; English: "dbp".}
+Chinese: \verb{\\u8212\\u5f20\\u538b}; English: "dbp".}
 
 \item{language}{Character; one of "chinese" (default) or "english" for output labels.}
 
@@ -57,7 +57,7 @@ rounding and percentile-based classification.
 Column mapping behavior:
 \itemize{
 \item If \code{sex_col/age_col/height_col/sbp_col/dbp_col} are not provided (all \code{NULL}), the function selects a default column-name mapping by \code{language}.
-\item \code{language = "chinese"} prefers: "\u6027\u522b"/"\u5e74\u9f84"/"\u8eab\u9ad8"/"\u6536\u7f29\u538b"/"\u8212\u5f20\u538b".
+\item \code{language = "chinese"} prefers: \verb{\\u6027\\u522b}/\verb{\\u5e74\\u9f84}/\verb{\\u8eab\\u9ad8}/\verb{\\u6536\\u7f29\\u538b}/\verb{\\u8212\\u5f20\\u538b}.
 \item \code{language = "english"} prefers: "sex"/"age"/"height"/"sbp"/"dbp".
 \item If the preferred set is not found and the user did not provide any mapping arguments, the function will try the other set as a fallback. When fallback is used, a message is emitted by default.
 \item If any \verb{*_col} is explicitly provided, the function uses the provided mapping (no automatic fallback).
@@ -65,7 +65,7 @@ Column mapping behavior:
 
 Sex normalization:
 \itemize{
-\item Common inputs such as "male"/"female" (or "m"/"f") are normalized to "\u7537"/"\u5973" before table lookup.
+\item Common inputs such as "male"/"female" (or "m"/"f") are normalized to \verb{\\u7537}/\verb{\\u5973} before table lookup.
 }
 
 Robust age parsing logic:
@@ -99,14 +99,20 @@ as described in related hypertension guidelines.
 \examples{
 # 1. Basic usage (Chinese columns; default language = "chinese")
 df_cn <- data.frame(
-  c("\u7537", "\u5973"),
+  c(intToUtf8(0x7537), intToUtf8(0x5973)),
   c(10, 12),
   c(140, 150),
   c(110, 130),
   c(70, 85),
   check.names = FALSE
 )
-names(df_cn) <- c("\u6027\u522b", "\u5e74\u9f84", "\u8eab\u9ad8", "\u6536\u7f29\u538b", "\u8212\u5f20\u538b")
+names(df_cn) <- c(
+  intToUtf8(c(0x6027, 0x522b)),
+  intToUtf8(c(0x5e74, 0x9f84)),
+  intToUtf8(c(0x8eab, 0x9ad8)),
+  intToUtf8(c(0x6536, 0x7f29, 0x538b)),
+  intToUtf8(c(0x8212, 0x5f20, 0x538b))
+)
 # evaluate_bp(df_cn)
 
 # 2. Basic usage (English columns; use language = "english")
