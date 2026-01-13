@@ -5,7 +5,7 @@ library(CNChildBP)
 
 # Example data (English column names)
 df <- data.frame(
-  sex = c("男", "女"),
+  sex = c("\u7537", "\u5973"),
   age = c(10, 12),
   height = c(140, 150),
   sbp = c(110, 130),

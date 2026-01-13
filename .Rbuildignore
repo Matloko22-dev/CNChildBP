@@ -15,3 +15,5 @@
 ^check_.*\.txt$
 ^CNChildBP_.*\.tar\.gz$
 ^CITATION\.cff$
+^inst/examples/demo_output_cn\.csv$
+^README\.md$

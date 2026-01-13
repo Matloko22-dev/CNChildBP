@@ -9,7 +9,7 @@
 #' @name bp_standards
 #' @format A data.frame with columns including (but not limited to):
 #' \describe{
-#'   \item{Sex}{character: "男" / "女"}
+#'   \item{Sex}{character: "\u7537" / "\u5973"}
 #'   \item{Age}{integer: whole years 3..17}
 #'   \item{Height_Lower, Height_Upper}{integer: height interval bounds (cm)}
 #'   \item{SBP_P90, SBP_P95, SBP_P99}{numeric: systolic BP percentiles}

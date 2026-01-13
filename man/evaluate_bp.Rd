@@ -20,25 +20,25 @@ evaluate_bp(
 
 \item{sex_col}{Character; name of the sex column.
 If \code{NULL} (default), the function uses a language-specific default mapping:
-Chinese: "性别"; English: "sex".}
+Chinese: "\u6027\u522b"; English: "sex".}
 
 \item{age_col}{Character; name of the age column.
 If \code{NULL} (default), the function uses a language-specific default mapping:
-Chinese: "年龄"; English: "age".
-Supported formats include numeric years, "10", "10.5", "10岁",
-"3岁5月", "3y5m", "75months", "75月", etc.}
+Chinese: "\u5e74\u9f84"; English: "age".
+Supported formats include numeric years, "10", "10.5", "10\u5c81",
+"3\u5c81 5\u6708", "3y5m", "75months", "75\u6708", etc.}
 
 \item{height_col}{Character; name of the height column in cm.
 If \code{NULL} (default), the function uses a language-specific default mapping:
-Chinese: "身高"; English: "height".}
+Chinese: "\u8eab\u9ad8"; English: "height".}
 
 \item{sbp_col}{Character; name of systolic BP column.
 If \code{NULL} (default), the function uses a language-specific default mapping:
-Chinese: "收缩压"; English: "sbp".}
+Chinese: "\u6536\u7f29\u538b"; English: "sbp".}
 
 \item{dbp_col}{Character; name of diastolic BP column.
 If \code{NULL} (default), the function uses a language-specific default mapping:
-Chinese: "舒张压"; English: "dbp".}
+Chinese: "\u8212\u5f20\u538b"; English: "dbp".}
 
 \item{language}{Character; one of "chinese" (default) or "english" for output labels.}
 
@@ -57,7 +57,7 @@ rounding and percentile-based classification.
 Column mapping behavior:
 \itemize{
 \item If \code{sex_col/age_col/height_col/sbp_col/dbp_col} are not provided (all \code{NULL}), the function selects a default column-name mapping by \code{language}.
-\item \code{language = "chinese"} prefers: "性别"/"年龄"/"身高"/"收缩压"/"舒张压".
+\item \code{language = "chinese"} prefers: "\u6027\u522b"/"\u5e74\u9f84"/"\u8eab\u9ad8"/"\u6536\u7f29\u538b"/"\u8212\u5f20\u538b".
 \item \code{language = "english"} prefers: "sex"/"age"/"height"/"sbp"/"dbp".
 \item If the preferred set is not found and the user did not provide any mapping arguments, the function will try the other set as a fallback. When fallback is used, a message is emitted by default.
 \item If any \verb{*_col} is explicitly provided, the function uses the provided mapping (no automatic fallback).
@@ -65,7 +65,7 @@ Column mapping behavior:
 
 Sex normalization:
 \itemize{
-\item Common inputs such as "male"/"female" (or "m"/"f") are normalized to "男"/"女" before table lookup.
+\item Common inputs such as "male"/"female" (or "m"/"f") are normalized to "\u7537"/"\u5973" before table lookup.
 }
 
 Robust age parsing logic:
@@ -83,15 +83,15 @@ Height matching:
 Evaluation categories:
 \itemize{
 \item Normal: SBP < P90 and DBP < P90
-\item High-normal: P90 ≤ BP < P95, or BP ≥ 120/80 mmHg (but below hypertension thresholds)
-\item Stage 1 Hypertension: P95 ≤ BP < P99 + 5 mmHg
-\item Stage 2 Hypertension: BP ≥ P99 + 5 mmHg
+\item High-normal: P90 <= BP < P95, or BP >= 120/80 mmHg (but below hypertension thresholds)
+\item Stage 1 Hypertension: P95 <= BP < P99 + 5 mmHg
+\item Stage 2 Hypertension: BP >= P99 + 5 mmHg
 }
 
 Important note (diagnosis vs classification):
 \itemize{
 \item This function performs single-record BP \emph{classification} based on percentile thresholds.
-\item Clinical \emph{diagnosis} of pediatric hypertension typically requires elevated BP (≥ P95)
+\item Clinical \emph{diagnosis} of pediatric hypertension typically requires elevated BP (>= P95)
 confirmed at multiple visits (e.g., re-check after 2--4 weeks and confirmed across 3 time points),
 as described in related hypertension guidelines.
 }
@@ -99,12 +99,14 @@ as described in related hypertension guidelines.
 \examples{
 # 1. Basic usage (Chinese columns; default language = "chinese")
 df_cn <- data.frame(
-  性别 = c("男", "女"),
-  年龄 = c(10, 12),
-  身高 = c(140, 150),
-  收缩压 = c(110, 130),
-  舒张压 = c(70, 85)
+  c("\u7537", "\u5973"),
+  c(10, 12),
+  c(140, 150),
+  c(110, 130),
+  c(70, 85),
+  check.names = FALSE
 )
+names(df_cn) <- c("\u6027\u522b", "\u5e74\u9f84", "\u8eab\u9ad8", "\u6536\u7f29\u538b", "\u8212\u5f20\u538b")
 # evaluate_bp(df_cn)
 
 # 2. Basic usage (English columns; use language = "english")
