@@ -11,21 +11,21 @@
 #' Column mapping behavior:
 #' \itemize{
 #'   \item If `sex_col/age_col/height_col/sbp_col/dbp_col` are not provided (all `NULL`), the function selects a default column-name mapping by `language`.
-#'   \item `language = "chinese"` prefers: "性别"/"年龄"/"身高"/"收缩压"/"舒张压".
+#'   \item `language = "chinese"` prefers: \verb{\\u6027\\u522b}/\verb{\\u5e74\\u9f84}/\verb{\\u8eab\\u9ad8}/\verb{\\u6536\\u7f29\\u538b}/\verb{\\u8212\\u5f20\\u538b}.
 #'   \item `language = "english"` prefers: "sex"/"age"/"height"/"sbp"/"dbp".
-#'   \item If the preferred set is not found and the user did not provide any mapping arguments, the function will try the other set as a fallback.
+#'   \item If the preferred set is not found and the user did not provide any mapping arguments, the function will try the other set as a fallback. When fallback is used, a message is emitted by default.
 #'   \item If any `*_col` is explicitly provided, the function uses the provided mapping (no automatic fallback).
 #' }
 #'
 #' Sex normalization:
 #' \itemize{
-#'   \item Common inputs such as "male"/"female" (or "m"/"f") are normalized to "男"/"女" before table lookup.
+#'   \item Common inputs such as "male"/"female" (or "m"/"f") are normalized to \verb{\\u7537}/\verb{\\u5973} before table lookup.
 #' }
 #'
 #' Robust age parsing logic:
 #' \itemize{
 #'   \item Mixed years and months (e.g. "3 years 5 months") are parsed as \eqn{years + months/12}.
-#'   \item Pure numeric values are interpreted as years if <= 18, otherwise as months (divided by 12).
+#'   \item Pure numeric values are interpreted as years if <= 18. If > 18, they are interpreted as months only when (value/12) yields an age within 3--17 years; otherwise they are treated as years.
 #'   \item Parsed ages are floored to whole years for table lookup.
 #' }
 #'
@@ -37,15 +37,15 @@
 #' Evaluation categories:
 #' \itemize{
 #'   \item Normal: SBP < P90 and DBP < P90
-#'   \item High-normal: P90 ≤ BP < P95, or BP ≥ 120/80 mmHg (but below hypertension thresholds)
-#'   \item Stage 1 Hypertension: P95 ≤ BP < P99 + 5 mmHg
-#'   \item Stage 2 Hypertension: BP ≥ P99 + 5 mmHg
+#'   \item High-normal: P90 <= BP < P95, or BP >= 120/80 mmHg (but below hypertension thresholds)
+#'   \item Stage 1 Hypertension: P95 <= BP < P99 + 5 mmHg
+#'   \item Stage 2 Hypertension: BP >= P99 + 5 mmHg
 #' }
 #'
 #' Important note (diagnosis vs classification):
 #' \itemize{
 #'   \item This function performs single-record BP \emph{classification} based on percentile thresholds.
-#'   \item Clinical \emph{diagnosis} of pediatric hypertension typically requires elevated BP (≥ P95)
+#'   \item Clinical \emph{diagnosis} of pediatric hypertension typically requires elevated BP (>= P95)
 #'     confirmed at multiple visits (e.g., re-check after 2--4 weeks and confirmed across 3 time points),
 #'     as described in related hypertension guidelines.
 #' }
@@ -53,22 +53,23 @@
 #' @param data A data.frame containing measurements to evaluate.
 #' @param sex_col Character; name of the sex column.
 #'   If `NULL` (default), the function uses a language-specific default mapping:
-#'   Chinese: "性别"; English: "sex".
+#'   Chinese: \verb{\\u6027\\u522b}; English: "sex".
 #' @param age_col Character; name of the age column.
 #'   If `NULL` (default), the function uses a language-specific default mapping:
-#'   Chinese: "年龄"; English: "age".
-#'   Supported formats include numeric years, "10", "10.5", "10岁",
-#'   "3岁5月", "3y5m", "75months", "75月", etc.
+#'   Chinese: \verb{\\u5e74\\u9f84}; English: "age".
+#'   Supported formats include numeric years, "10", "10.5", \verb{10\\u5c81},
+#'   \verb{3\\u5c81 5\\u6708}, "3y5m", "75months", \verb{75\\u6708}, etc.
 #' @param height_col Character; name of the height column in cm.
 #'   If `NULL` (default), the function uses a language-specific default mapping:
-#'   Chinese: "身高"; English: "height".
+#'   Chinese: \verb{\\u8eab\\u9ad8}; English: "height".
 #' @param sbp_col Character; name of systolic BP column.
 #'   If `NULL` (default), the function uses a language-specific default mapping:
-#'   Chinese: "收缩压"; English: "sbp".
+#'   Chinese: \verb{\\u6536\\u7f29\\u538b}; English: "sbp".
 #' @param dbp_col Character; name of diastolic BP column.
 #'   If `NULL` (default), the function uses a language-specific default mapping:
-#'   Chinese: "舒张压"; English: "dbp".
+#'   Chinese: \verb{\\u8212\\u5f20\\u538b}; English: "dbp".
 #' @param language Character; one of "chinese" (default) or "english" for output labels.
+#' @param quiet Logical; if `TRUE`, suppress informational messages (e.g., when column-name fallback is used).
 #'
 #' @return The input data.frame with an added `BP_Evaluation` column.
 #'
@@ -79,11 +80,19 @@
 #' @examples
 #' # 1. Basic usage (Chinese columns; default language = "chinese")
 #' df_cn <- data.frame(
-#'   性别 = c("男", "女"),
-#'   年龄 = c(10, 12),
-#'   身高 = c(140, 150),
-#'   收缩压 = c(110, 130),
-#'   舒张压 = c(70, 85)
+#'   c(intToUtf8(0x7537), intToUtf8(0x5973)),
+#'   c(10, 12),
+#'   c(140, 150),
+#'   c(110, 130),
+#'   c(70, 85),
+#'   check.names = FALSE
+#' )
+#' names(df_cn) <- c(
+#'   intToUtf8(c(0x6027, 0x522b)),
+#'   intToUtf8(c(0x5e74, 0x9f84)),
+#'   intToUtf8(c(0x8eab, 0x9ad8)),
+#'   intToUtf8(c(0x6536, 0x7f29, 0x538b)),
+#'   intToUtf8(c(0x8212, 0x5f20, 0x538b))
 #' )
 #' # evaluate_bp(df_cn)
 #'
@@ -115,10 +124,15 @@ evaluate_bp <- function(data,
                         height_col = NULL,
                         sbp_col = NULL,
                         dbp_col = NULL,
-                        language = c("chinese", "english")) {
+                        language = c("chinese", "english"),
+                        quiet = FALSE) {
 
   # 0. match language argument
   language <- match.arg(language)
+
+  if (!is.logical(quiet) || length(quiet) != 1 || is.na(quiet)) {
+    stop("`quiet` must be a single TRUE/FALSE value")
+  }
 
   # 0b. column name mapping defaults
   user_provided_mapping <- !is.null(sex_col) || !is.null(age_col) || !is.null(height_col) || !is.null(sbp_col) || !is.null(dbp_col)
@@ -193,6 +207,9 @@ evaluate_bp <- function(data,
   required_cols <- c(sex_col, age_col, height_col, sbp_col, dbp_col)
   missing_cols <- setdiff(required_cols, names(data))
 
+  used_fallback <- FALSE
+  fallback_direction <- NULL
+
   # If user did not provide any mapping args, try the other language's defaults as a fallback.
   if (length(missing_cols) > 0 && !user_provided_mapping) {
     fallback_cols <- if (language == "chinese") {
@@ -216,6 +233,23 @@ evaluate_bp <- function(data,
       dbp_col <- fallback_cols$dbp_col
       required_cols <- fallback_required
       missing_cols <- character(0)
+
+      used_fallback <- TRUE
+      fallback_direction <- if (language == "chinese") "english" else "chinese"
+    }
+  }
+
+  if (used_fallback && !quiet) {
+    if (identical(fallback_direction, "english")) {
+      message(
+        "Column mapping fallback: language='chinese' but detected English columns (sex, age, height, sbp, dbp). ",
+        "Use *_col to override or quiet=TRUE to suppress this message."
+      )
+    } else {
+      message(
+        "Column mapping fallback: language='english' but detected Chinese default columns (sex/age/height/sbp/dbp in Chinese). ",
+        "Use *_col to override or quiet=TRUE to suppress this message."
+      )
     }
   }
 
@@ -259,8 +293,16 @@ evaluate_bp <- function(data,
 
       num_val <- suppressWarnings(as.numeric(s))
       if (!is.na(num_val)) {
-        # If value > 18, it is likely months (e.g., 74 months). Otherwise treat as years.
-        if (num_val > 18) return(num_val / 12)
+        # For bare numeric values, decide between interpreting as years vs. months.
+        # If value > 18, consider it as months only when that yields an age within 3-17 years.
+        if (num_val > 18) {
+          age_as_years_from_months <- num_val / 12
+          if (age_as_years_from_months >= 3 && age_as_years_from_months <= 17) {
+            return(age_as_years_from_months)
+          }
+          # Otherwise, treat the numeric value as years and let downstream validation handle range.
+          return(num_val)
+        }
         return(num_val)
       }
 
@@ -314,11 +356,11 @@ evaluate_bp <- function(data,
       # --- systolic BP (SBP) evaluation ---
       sbp_status = dplyr::case_when(
         is.na(SBP_) ~ labels$missing,
-        # 2期: >= P99 + 5 mmHg
+        # Stage 2: >= P99 + 5 mmHg
         SBP_ >= (SBP_P99 + 5) ~ labels$stage2,
-        # 1期: P95 ~ P99 + 5
+        # Stage 1: P95 ~ (P99 + 5)
         SBP_ >= SBP_P95 ~ labels$stage1,
-        # 正常高值: P90 ~ P95 或 >= 120 (即使小于P90)
+        # High-normal: P90 ~ P95, or >= 120 even if < P90
         SBP_ >= SBP_P90 | SBP_ >= 120 ~ labels$high_normal,
         TRUE ~ labels$normal
       ),
@@ -357,6 +399,5 @@ evaluate_bp <- function(data,
   return(final_result)
 }
 
-
 ## Declare globals to satisfy R CMD check NOTES about undefined globals
- 
+

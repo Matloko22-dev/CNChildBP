@@ -11,7 +11,8 @@ evaluate_bp(
   height_col = NULL,
   sbp_col = NULL,
   dbp_col = NULL,
-  language = c("chinese", "english")
+  language = c("chinese", "english"),
+  quiet = FALSE
 )
 }
 \arguments{
@@ -19,27 +20,29 @@ evaluate_bp(
 
 \item{sex_col}{Character; name of the sex column.
 If \code{NULL} (default), the function uses a language-specific default mapping:
-Chinese: "性别"; English: "sex".}
+Chinese: \verb{\\u6027\\u522b}; English: "sex".}
 
 \item{age_col}{Character; name of the age column.
 If \code{NULL} (default), the function uses a language-specific default mapping:
-Chinese: "年龄"; English: "age".
-Supported formats include numeric years, "10", "10.5", "10岁",
-"3岁5月", "3y5m", "75months", "75月", etc.}
+Chinese: \verb{\\u5e74\\u9f84}; English: "age".
+Supported formats include numeric years, "10", "10.5", \verb{10\\u5c81},
+\verb{3\\u5c81 5\\u6708}, "3y5m", "75months", \verb{75\\u6708}, etc.}
 
 \item{height_col}{Character; name of the height column in cm.
 If \code{NULL} (default), the function uses a language-specific default mapping:
-Chinese: "身高"; English: "height".}
+Chinese: \verb{\\u8eab\\u9ad8}; English: "height".}
 
 \item{sbp_col}{Character; name of systolic BP column.
 If \code{NULL} (default), the function uses a language-specific default mapping:
-Chinese: "收缩压"; English: "sbp".}
+Chinese: \verb{\\u6536\\u7f29\\u538b}; English: "sbp".}
 
 \item{dbp_col}{Character; name of diastolic BP column.
 If \code{NULL} (default), the function uses a language-specific default mapping:
-Chinese: "舒张压"; English: "dbp".}
+Chinese: \verb{\\u8212\\u5f20\\u538b}; English: "dbp".}
 
 \item{language}{Character; one of "chinese" (default) or "english" for output labels.}
+
+\item{quiet}{Logical; if \code{TRUE}, suppress informational messages (e.g., when column-name fallback is used).}
 }
 \value{
 The input data.frame with an added \code{BP_Evaluation} column.
@@ -54,21 +57,21 @@ rounding and percentile-based classification.
 Column mapping behavior:
 \itemize{
 \item If \code{sex_col/age_col/height_col/sbp_col/dbp_col} are not provided (all \code{NULL}), the function selects a default column-name mapping by \code{language}.
-\item \code{language = "chinese"} prefers: "性别"/"年龄"/"身高"/"收缩压"/"舒张压".
+\item \code{language = "chinese"} prefers: \verb{\\u6027\\u522b}/\verb{\\u5e74\\u9f84}/\verb{\\u8eab\\u9ad8}/\verb{\\u6536\\u7f29\\u538b}/\verb{\\u8212\\u5f20\\u538b}.
 \item \code{language = "english"} prefers: "sex"/"age"/"height"/"sbp"/"dbp".
-\item If the preferred set is not found and the user did not provide any mapping arguments, the function will try the other set as a fallback.
+\item If the preferred set is not found and the user did not provide any mapping arguments, the function will try the other set as a fallback. When fallback is used, a message is emitted by default.
 \item If any \verb{*_col} is explicitly provided, the function uses the provided mapping (no automatic fallback).
 }
 
 Sex normalization:
 \itemize{
-\item Common inputs such as "male"/"female" (or "m"/"f") are normalized to "男"/"女" before table lookup.
+\item Common inputs such as "male"/"female" (or "m"/"f") are normalized to \verb{\\u7537}/\verb{\\u5973} before table lookup.
 }
 
 Robust age parsing logic:
 \itemize{
 \item Mixed years and months (e.g. "3 years 5 months") are parsed as \eqn{years + months/12}.
-\item Pure numeric values are interpreted as years if <= 18, otherwise as months (divided by 12).
+\item Pure numeric values are interpreted as years if <= 18. If > 18, they are interpreted as months only when (value/12) yields an age within 3--17 years; otherwise they are treated as years.
 \item Parsed ages are floored to whole years for table lookup.
 }
 
@@ -80,15 +83,15 @@ Height matching:
 Evaluation categories:
 \itemize{
 \item Normal: SBP < P90 and DBP < P90
-\item High-normal: P90 ≤ BP < P95, or BP ≥ 120/80 mmHg (but below hypertension thresholds)
-\item Stage 1 Hypertension: P95 ≤ BP < P99 + 5 mmHg
-\item Stage 2 Hypertension: BP ≥ P99 + 5 mmHg
+\item High-normal: P90 <= BP < P95, or BP >= 120/80 mmHg (but below hypertension thresholds)
+\item Stage 1 Hypertension: P95 <= BP < P99 + 5 mmHg
+\item Stage 2 Hypertension: BP >= P99 + 5 mmHg
 }
 
 Important note (diagnosis vs classification):
 \itemize{
 \item This function performs single-record BP \emph{classification} based on percentile thresholds.
-\item Clinical \emph{diagnosis} of pediatric hypertension typically requires elevated BP (≥ P95)
+\item Clinical \emph{diagnosis} of pediatric hypertension typically requires elevated BP (>= P95)
 confirmed at multiple visits (e.g., re-check after 2--4 weeks and confirmed across 3 time points),
 as described in related hypertension guidelines.
 }
@@ -96,11 +99,19 @@ as described in related hypertension guidelines.
 \examples{
 # 1. Basic usage (Chinese columns; default language = "chinese")
 df_cn <- data.frame(
-  性别 = c("男", "女"),
-  年龄 = c(10, 12),
-  身高 = c(140, 150),
-  收缩压 = c(110, 130),
-  舒张压 = c(70, 85)
+  c(intToUtf8(0x7537), intToUtf8(0x5973)),
+  c(10, 12),
+  c(140, 150),
+  c(110, 130),
+  c(70, 85),
+  check.names = FALSE
+)
+names(df_cn) <- c(
+  intToUtf8(c(0x6027, 0x522b)),
+  intToUtf8(c(0x5e74, 0x9f84)),
+  intToUtf8(c(0x8eab, 0x9ad8)),
+  intToUtf8(c(0x6536, 0x7f29, 0x538b)),
+  intToUtf8(c(0x8212, 0x5f20, 0x538b))
 )
 # evaluate_bp(df_cn)
 
